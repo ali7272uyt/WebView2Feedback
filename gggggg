@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IPTV Ali Player</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #111;
+      color: #eee;
+    }
+    header {
+      background: linear-gradient(90deg, #0d47a1, #1976d2);
+      padding: 15px;
+      font-size: 24px;
+      text-align: center;
+      font-weight: bold;
+      color: #fff;
+      user-select: none;
+    }
+    .container {
+      padding: 15px;
+    }
+    video {
+      width: 100%;
+      height: 300px;
+      background: black;
+      margin-bottom: 10px;
+    }
+    .channel-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .channel {
+      background: #333;
+      padding: 10px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      flex: 1 1 calc(50% - 10px);
+      text-align: center;
+    }
+    .channel.active {
+      background: #2196f3;
+      color: white;
+    }
+    #status {
+      margin: 10px 0;
+      font-size: 14px;
+      color: #0f0;
+    }
+    input[type="file"], input[type="url"] {
+      margin: 10px 0;
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 5px;
+      border: none;
+    }
+    button {
+      padding: 10px 20px;
+      background: #2196f3;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    @media (max-width: 600px) {
+      video {
+        height: 200px;
+      }
+      .channel {
+        flex: 1 1 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<header>IPTV Ali Player</header>
+
+<div class="container">
+  <video id="video" controls autoplay muted playsinline></video>
+
+  <div id="status">اختر قناة للبدء</div>
+
+  <input type="file" id="file-input" accept=".m3u,.m3u8">
+  <input type="url" id="url-input" placeholder="أدخل رابط بث مباشر (M3U8)">
+  <button onclick="loadDirectURL()">تشغيل الرابط المباشر</button>
+
+  <div class="channel-list" id="channels"></div>
+</div>
+
+<script>
+  const video = document.getElementById("video");
+  const fileInput = document.getElementById("file-input");
+  const urlInput = document.getElementById("url-input");
+  const status = document.getElementById("status");
+  const channelsDiv = document.getElementById("channels");
+  let hls = null;
+  let activeChannel = null;
+
+  function playStream(url) {
+    if (hls) {
+      hls.destroy();
+      hls = null;
+    }
+    if (Hls.isSupported() && url.endsWith('.m3u8')) {
+      hls = new Hls();
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.ERROR, function (event, data) {
+        console.error("خطأ في التشغيل", data);
+        status.textContent = "حدث خطأ في تشغيل البث.";
+      });
+    } else {
+      video.src = url;
+    }
+    video.play().catch(() => {
+      status.textContent = "اضغط تشغيل إذا لم يبدأ الفيديو.";
+    });
+  }
+
+  function addChannel(name, url) {
+    const div = document.createElement("div");
+    div.className = "channel";
+    div.textContent = name;
+    div.onclick = () => {
+      if (activeChannel) activeChannel.classList.remove("active");
+      div.classList.add("active");
+      activeChannel = div;
+      status.textContent = `تشغيل: ${name}`;
+      playStream(url);
+    };
+    channelsDiv.appendChild(div);
+  }
+
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      channelsDiv.innerHTML = '';
+      const lines = reader.result.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith("#EXTINF")) {
+          const name = lines[i].split(",")[1] || `قناة ${i}`;
+          const url = lines[i + 1];
+          if (url && url.startsWith("http")) addChannel(name, url);
+        }
+      }
+      status.textContent = "تم تحميل القنوات بنجاح.";
+    };
+    reader.readAsText(file);
+  });
+
+  function loadDirectURL() {
+    const url = urlInput.value.trim();
+    if (url && (url.startsWith("http") || url.startsWith("https"))) {
+      playStream(url);
+      status.textContent = "تشغيل من رابط مباشر";
+    } else {
+      alert("أدخل رابط صحيح");
+    }
+  }
+</script>
+
+</body>
+</html>
